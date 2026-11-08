@@ -480,10 +480,38 @@ function A.EndHistoryPreview()
 end
 function A.Messages()
  if #(A.history or {})>0 and not unlocked() then A.history={} end
+ local history=A.history or {}
  local out,order={},{}
- for _,v in ipairs(A.history or {}) do out[#out+1]=v end
- -- CHAT_MSG_GUILD has no ClubMessageIdentifier. Do not guess that matching
- -- text/time identifies the same message: two real identical messages can occur.
+ local matched={}
+ if #history>0 and #A.chat>0 then
+  local _,realm=playerName()
+  local function key(row)
+   local name,server=row.author:match('^([^%-]+)%-(.+)$')
+   return ((server and server==realm) and name or row.author)..'\0'..row.text
+  end
+  local liveByText={}
+  for _,row in ipairs(A.chat) do
+   if row.stamp then
+    local id=key(row)
+    local group=liveByText[id] or {}
+    group[#group+1]=row;liveByText[id]=group
+   end
+  end
+  local used={}
+  for _,row in ipairs(history) do
+   if row.stamp and not row.temporary then
+    local best,distance=nil,3
+    -- Live receipt time can cross a second boundary. Pair each public history
+    -- copy with at most one live row, and leave opaque rows to the native preview.
+    for _,live in ipairs(liveByText[key(row)] or {}) do
+     local delta=math.abs(live.stamp-row.stamp)
+     if not used[live] and delta<distance then best,distance=live,delta end
+    end
+    if best then used[best]=true;matched[row]=true end
+   end
+  end
+ end
+ for _,v in ipairs(history) do if not matched[v] then out[#out+1]=v end end
  for _,v in ipairs(A.chat) do out[#out+1]=v end
  for i,v in ipairs(out) do order[v]=i end
  table.sort(out,function(a,b)

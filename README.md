@@ -4,7 +4,7 @@ Guild Panel добавляет окно гильдии с чатом, списк
 
 ## Установка
 
-1. Скачайте `WinxGuild-0.3.32.zip` со [страницы релизов](https://github.com/AlohaG0/Guild-Panel/releases).
+1. Скачайте `WinxGuild-0.3.33.zip` со [страницы релизов](https://github.com/AlohaG0/Guild-Panel/releases).
 2. Распакуйте папку `WinxGuild` в `World of Warcraft/_forever_/Interface/AddOns/`.
 3. Запустите игру или введите `/reload`. Откройте окно командой `/guildpanel` или щелчком по значку аддона.
 

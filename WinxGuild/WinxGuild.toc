@@ -4,7 +4,7 @@
 ## IconTexture: Interface\Icons\INV_Shield_04
 ## Notes-ruRU: Современное окно гильдии с темами и поиском. Управление через интерфейс Blizzard.
 ## Author: anton
-## Version: 0.3.32
+## Version: 0.3.33
 ## SavedVariables: WinxGuildSettings
 ## SavedVariablesPerCharacter: WinxGuildAlertArchive
 Model.lua
