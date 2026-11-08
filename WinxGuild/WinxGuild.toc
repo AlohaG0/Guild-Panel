@@ -1,0 +1,14 @@
+## Interface: 16001
+## Title: Guild Panel
+## Title-ruRU: Guild Panel
+## IconTexture: Interface\Icons\INV_Shield_04
+## Notes-ruRU: Современное окно гильдии с темами и поиском. Управление через интерфейс Blizzard.
+## Author: anton
+## Version: 0.3.32
+## SavedVariables: WinxGuildSettings
+## SavedVariablesPerCharacter: WinxGuildAlertArchive
+Model.lua
+Client.lua
+UI.lua
+Chat.lua
+Core.lua
