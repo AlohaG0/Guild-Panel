@@ -1,0 +1,35 @@
+name: Publish verified addon releases
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-addons.yml'
+      - 'scripts/build_release.py'
+      - 'scripts/publish_releases.py'
+      - 'scripts/release-manifest.json'
+      - 'releases/*.md'
+permissions:
+  contents: write
+concurrency:
+  group: publish-addon-releases
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out exact public source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach FETCH_HEAD
+      - name: Verify reviewed files and build both ZIPs
+        run: python3 scripts/build_release.py
+      - name: Publish releases and verify uploaded SHA256
+        run: python3 scripts/publish_releases.py
