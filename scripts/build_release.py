@@ -36,10 +36,11 @@ for addon, version, filename, count in (
     assert len(files) == count
     assert ('## Version: ' + version).encode() in content[addon + '/' + addon + '.toc']
     target = args.output / filename
-    with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(target, 'w', zipfile.ZIP_STORED) as archive:
         for name in files:
             entry = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
-            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.compress_type = zipfile.ZIP_STORED
+            entry.create_system = 3
             entry.external_attr = 0o100644 << 16
             archive.writestr(entry, content[name])
     with zipfile.ZipFile(target) as archive:
