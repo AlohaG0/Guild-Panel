@@ -1,4 +1,5 @@
 local M = {}
+M.NoteLimit=30
 local defaults = {version=1,theme='fairy',scale=1,opacity=0.96,font=14,density='comfortable',decor=true,logo='shield',displayName=''}
 M.Logos={
  {'shield','Щит','Interface\\Icons\\INV_Shield_04'},
@@ -22,7 +23,10 @@ end
 function M.Settings(saved)
  local result={}
  for k,v in pairs(defaults) do result[k]=v end
- if saved~=nil and (type(saved)~='table' or (saved.version~=nil and saved.version~=1)) then return result,false end
+ if saved~=nil and (type(saved)~='table' or (saved.version~=nil and saved.version~=1)) then
+  result.notes={}
+  return result,false
+ end
  if type(saved)=='table' then
   for k,v in pairs(saved) do result[k]=v end
   result.version=1
@@ -43,6 +47,16 @@ function M.Settings(saved)
    result.launcherY=clamp(saved.launcherY,0,-10000,10000)
   end
  end
+ result.notes={}
+ if type(saved)=='table' and type(saved.notes)=='table' then
+  for i=1,M.NoteLimit do
+   local note=saved.notes[i]
+   if type(note)=='table' and type(note.title)=='string' and #note.title<=240
+    and type(note.body)=='string' and #note.body<=16000 then
+    result.notes[#result.notes+1]={title=note.title,body=note.body}
+   end
+  end
+ end
  return result,true
 end
 function M.Fold(s)
@@ -53,7 +67,8 @@ function M.Fold(s)
  for i,v in ipairs(upper) do s=s:gsub(v,lower[i]) end
  return s
 end
-function M.Plain(s) return tostring(s or ''):gsub('|','||') end
+-- Parentheses discard gsub's replacement count before native widget calls.
+function M.Plain(s) return (tostring(s or ''):gsub('|','||')) end
 function M.OnlineSummary(rows, playerZone, playerName, playerRealm, instances)
  local summary={all={},nearby={},dungeon={},raid={}}
  for _,member in ipairs(M.Filter(rows,'',true,'name',false)) do
@@ -147,15 +162,18 @@ function M.Message(chat,author,text,time,stamp)
  return chat[#chat]
 end
 function M.Chat(chat,query)
- local out={};query=M.Fold(query)
+ query=M.Fold(query):match('^%s*(.-)%s*$')
+ if query=='' then return chat,0 end
+ local out,limited={},0
+ local function matches(value) return M.Fold(value):find(query,1,true) end
  for _,r in ipairs(chat) do
-  -- Both historical author and content may be opaque client-rendered Kstrings.
-  -- Never parse either; history is shown only with an empty search field.
-  if r.historical then
-   if query=='' then out[#out+1]=r end
-  elseif M.Fold(r.author..' '..r.text):find(query,1,true) then out[#out+1]=r end
+  if r.temporary then limited=limited+1 end
+  if ((not r.temporary or r.searchAuthor) and matches(r.author))
+   or ((not r.temporary or r.searchText) and matches(r.text)) then
+   out[#out+1]=r
+  end
  end
- return out
+ return out,limited
 end
 local chatLinkTypes={item=true,spell=true,enchant=true,quest=true,achievement=true,trade=true}
 function M.IsChatLink(link)

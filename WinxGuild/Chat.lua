@@ -139,9 +139,20 @@ function U.RefreshChat()
  -- in the bounded session model and are displayed when the user chooses Down.
  if not U.followChat then return end
  U.chatFrame:Clear();U.replyTargets={}
- local messages=M.Chat(A.Messages(),U.chatQuery or '')
+ local chat=A.Messages()
+ local messages,limited=M.Chat(chat,U.chatQuery or '')
+ local searchStatus=''
+ if limited>0 then
+  if #messages==0 then
+   messages=chat
+   searchStatus='Совпадений в доступном тексте нет. Часть истории недоступна для поиска. Показан весь чат.'
+  else
+   searchStatus='Совпадений: '..#messages..'. Часть истории WoW доступна для поиска не полностью.'
+  end
+ end
+ U.chatSearchStatus:SetText(searchStatus)
  if #messages==0 then
-  local hint=U.chatQuery and U.chatQuery~='' and 'Поиск включён. Очистите поле, чтобы показать чат.' or 'Нет доступных сообщений гильдии.'
+  local hint=U.chatQuery and U.chatQuery:find('%S') and 'Совпадений в доступном тексте чата нет.' or 'Нет доступных сообщений гильдии.'
   U.chatFrame:AddMessage(hint,0.7,0.65,0.8)
  end
  for _,m in ipairs(messages) do
@@ -156,8 +167,16 @@ end
 function U.BuildChat(page,h)
  local text,button,edit=h.text,h.button,h.edit
  h.heading(page,'Разговор у волшебного огня','Клик по имени - ответ. @Имя - быстрый выбор. Справа - кто онлайн.')
- U.chatSearch=edit(page,6,-78,460,'Поиск по текущей сессии. Очистите поле для истории.',function(q) U.chatQuery=q;U.followChat=true;U.Refresh() end)
+ text(page,'Поиск по нику или тексту',0,-60,13,395)
+ local function search(q)
+  U.chatQuery=q;U.followChat=true;U.Refresh()
+ end
+ U.chatSearch=edit(page,6,-78,390,'Поиск по нику или тексту в чате и доступной истории',search)
+ button(page,'Сброс',408,-78,74,function()
+  U.chatSearch:SetText('');search('')
+ end)
  button(page,'Загрузить историю',490,-78,250,U.LoadHistory)
+ U.chatSearchStatus=text(page,'',0,-110,11,750)
  local f=CreateFrame('ScrollingMessageFrame',nil,page);U.chatFrame=f
  f:SetPoint('TOPLEFT',0,-128);f:SetPoint('BOTTOMRIGHT',-230,140)
  page:SetScript('OnHide',function()
@@ -273,6 +292,6 @@ function U.BuildChat(page,h)
  times:ClearAllPoints();times:SetPoint('BOTTOMLEFT',245,35)
  local clear=button(page,'Очистить сеанс',0,0,190,function() A.chat={};U.unread=0;U.followChat=true;U.Refresh();U.Status('Очищена только текущая сессия. История Blizzard сохранена.') end)
  clear:ClearAllPoints();clear:SetPoint('BOTTOMLEFT',400,35)
- local note=text(page,'WoW может передать аддону неполную историю, в том числе без ваших сообщений.\nСверьте историю в окне Blizzard. Поиск и ответы доступны для текущего сеанса.',0,0,11,750)
+ local note=text(page,'Поиск использует имена и текст, которые WoW передаёт аддону.\nПолную доступную историю можно сверить в окне Blizzard.',0,0,11,750)
  note:ClearAllPoints();note:SetPoint('BOTTOMLEFT',0,4)
 end

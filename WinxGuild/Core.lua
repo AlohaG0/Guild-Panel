@@ -22,6 +22,11 @@ events:SetScript('OnEvent',function(_,event,...)
  elseif event=='CHAT_MSG_GUILD' then
   local message,author=...;local row=A.Receive(message,author)
   if row then U.NewMessage(A.IsOwnChatMessage(author,select(12,...))) end
+  local alert,sender=A.ReceiveChatAnnouncement(message,author)
+  if alert then
+   U.ShowAnnouncement(alert,sender)
+   if U.window:IsShown() and U.tab=='news' then U.RefreshNews() end
+  end
  elseif event=='CHAT_MSG_ADDON_LOGGED' then
   local message,sender=A.ReceiveAnnouncement(...)
   if message then

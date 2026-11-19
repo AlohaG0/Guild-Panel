@@ -112,7 +112,7 @@ function U.Paint()
  end
  for _,t in ipairs(U.surfaces) do t:SetColorTexture(p.panel[1],p.panel[2],p.panel[3],0.98) end
  for _,b in ipairs(U.buttons) do
-  local active=b.tab==U.tab or b.theme==s.theme
+  local active=b.tab==U.tab or b.theme==s.theme or b.selected
   b.bg:SetAlpha(1)
   b.bg:SetTexCoord(0,1,0,1)
   if stockTheme and b.tab then
@@ -167,7 +167,7 @@ end
 function U.ShowTab(key)
  U.tab=key
  for name,p in pairs(U.pages) do if name==key then p:Show() else p:Hide() end end
- local titles={overview='Дом гильдии',roster='Участники',chat='Гильдейский чат',news='Новости гильдии',info='Информация о гильдии',manage='Управление',settings='Настройки',about='Об аддоне'}
+ local titles={overview='Дом гильдии',roster='Участники',chat='Гильдейский чат',news='Новости гильдии',info='Информация о гильдии',manage='Управление',notes='Заметки',settings='Настройки',about='Об аддоне'}
  U.section:SetText(titles[key]);U.Refresh();U.Paint()
  if key=='chat' then U.LoadHistory() end
  if key=='news' then A.RequestNews() end
@@ -175,7 +175,6 @@ end
 function U.LoadHistory()
  U.followChat=true
  U.historyPreview=true
- U.chatQuery='';U.chatSearch:SetText('')
  local _,msg=A.History(true,true)
  U.Refresh();U.Status(msg)
 end
@@ -448,6 +447,7 @@ local function manage(page)
  U.announceLabel=text(page,'Важное сообщение',0,-461,13,155)
  U.announceDraft=edit(page,163,-453,410,'Оповещение гильдии, до 220 байт')
  U.announceDraft:SetMaxLetters(220)
+ text(page,'Офицер / глава: напишите в чат /g ВАЖНО - текст. Участникам нужен Guild Panel 0.3.40+.',0,-530,13,730)
  local function send()
   local ok,msg=A.SendAnnouncement(U.announceDraft:GetText())
   if ok then U.announceDraft:SetText('');U.announceDraft:ClearFocus() end
@@ -456,6 +456,139 @@ local function manage(page)
  U.announceSend=button(page,'Отправить',588,-453,145,send)
  U.announceDraft:SetScript('OnEnterPressed',send)
  text(page,'Приглашения, звания и настройки гильдии открываются в окне Blizzard.',0,-503,13,730)
+end
+local function notes(page)
+ heading(page,'Личные заметки','Записи хранятся у вас и сохраняются при выходе из игры или /reload.')
+ local records=U.settings.notes
+ local selected=#records>0 and 1 or 0
+ local bookmarkPage,pageSize=1,8
+ local confirming=false
+ local counter=text(page,'',220,-115,13,530)
+ local titleLabel=text(page,'',220,-85,17,325);titleLabel:SetWordWrap(false)
+ U.noteTitle=edit(page,226,-78,320,'Заголовок заметки')
+ U.noteTitle:SetMaxLetters(60)
+ local scroll=CreateFrame('ScrollFrame',nil,page)
+ scroll:SetPoint('TOPLEFT',220,-138);scroll:SetPoint('BOTTOMRIGHT',-12,24)
+ scroll:EnableMouseWheel(true);surface(scroll)
+ local body=CreateFrame('EditBox',nil,scroll);U.noteBody=body
+ body:SetSize(690,200);body:SetMultiLine(true);body:SetAutoFocus(false)
+ body:SetFontObject(GameFontHighlight);body:SetTextInsets(8,8,8,8);body:SetMaxLetters(4000)
+ scroll:SetScrollChild(body)
+ local measure=page:CreateFontString(nil,'ARTWORK','GameFontHighlight')
+ measure:SetWordWrap(true);measure:Hide()
+ local function fit()
+  local width=math.max(20,scroll:GetWidth())
+  measure:SetWidth(width-16);measure:SetText(M.Plain(body:GetText())..'\n ')
+  body:SetWidth(width);body:SetHeight(math.max(scroll:GetHeight(),measure:GetStringHeight()+16))
+ end
+ local function move(offset)
+  scroll:SetVerticalScroll(math.max(0,math.min(scroll:GetVerticalScrollRange(),offset)))
+ end
+ scroll:SetScript('OnSizeChanged',fit)
+ scroll:SetScript('OnMouseWheel',function(_,delta) move(scroll:GetVerticalScroll()-delta*36) end)
+ body:SetScript('OnCursorChanged',function(_,_,y,_,height)
+  local top=math.abs(y)
+  local offset=scroll:GetVerticalScroll()
+  if top<offset then move(top)
+  elseif top+height>offset+scroll:GetHeight() then move(top+height-scroll:GetHeight()) end
+ end)
+ local function cancelDelete()
+  confirming=false;U.deleteNote.label:SetText('Удалить')
+ end
+ local function noteName(index)
+  local title=records[index].title
+  return M.Plain(title:find('%S') and title or ('Заметка '..index))
+ end
+ local pageLabel=text(page,'',67,-439,12,75)
+ local function updateBookmarks()
+  local pages=math.max(1,math.ceil(#records/pageSize))
+  bookmarkPage=math.min(bookmarkPage,pages)
+  for i,b in ipairs(U.noteBookmarks) do
+   local index=(bookmarkPage-1)*pageSize+i
+   b.noteIndex=index;b.selected=index==selected
+   b:SetShown(records[index]~=nil)
+   if records[index] then b.label:SetText(noteName(index)) end
+  end
+  pageLabel:SetText(bookmarkPage..' / '..pages)
+  U.previousNote:SetEnabled(bookmarkPage>1);U.nextNote:SetEnabled(bookmarkPage<pages)
+  titleLabel:SetText(records[selected] and noteName(selected) or '')
+ end
+ local function endRename()
+  U.noteTitle:Hide();titleLabel:Show()
+ end
+ local function show()
+  cancelDelete()
+  local record=records[selected]
+  U.noteTitle:ClearFocus();body:ClearFocus()
+  U.noteTitle:SetText(record and record.title or '')
+  body:SetText(record and record.body or '')
+  endRename();scroll:SetShown(record~=nil);U.renameNote:SetShown(record~=nil)
+  U.addNote:SetEnabled(U.writable and #records<M.NoteLimit)
+  U.deleteNote:SetEnabled(U.writable and record~=nil)
+  updateBookmarks()
+  counter:SetText(not U.writable and 'Заметки недоступны: настройки сохранены более новой версией.'
+   or (record and ('Заметка '..selected..' из '..#records..' • автосохранение') or 'Нажмите «Новая заметка», чтобы начать.'))
+  fit();move(0)
+ end
+ U.addNote=button(page,'Новая заметка',0,-78,170,function()
+  if not U.writable or #records>=M.NoteLimit then return end
+  records[#records+1]={title='',body=''}
+  selected=#records;bookmarkPage=math.ceil(selected/pageSize);show();U.Paint()
+ end)
+ U.noteBookmarks={}
+ for i=1,pageSize do
+  local b=button(page,'',0,-122-(i-1)*38,196,function(self)
+   selected=self.noteIndex;show();U.Paint()
+  end)
+  b.listRow=true;b.label:SetWordWrap(false)
+  U.noteBookmarks[i]=b
+ end
+ U.previousNote=button(page,'<',0,-430,54,function()
+  bookmarkPage=math.max(1,bookmarkPage-1);updateBookmarks();U.Paint()
+ end)
+ U.nextNote=button(page,'>',142,-430,54,function()
+  bookmarkPage=bookmarkPage+1;updateBookmarks();U.Paint()
+ end)
+ U.renameNote=button(page,'',552,-78,32,function()
+  if not U.writable or not records[selected] then return end
+  titleLabel:Hide();U.noteTitle:Show();U.noteTitle:SetFocus();U.noteTitle:HighlightText()
+ end)
+ local pencil=U.renameNote:CreateTexture(nil,'ARTWORK')
+ pencil:SetSize(15,5);pencil:SetPoint('CENTER',0,0)
+ pencil:SetColorTexture(0.98,0.77,0.38,1);pencil:SetRotation(math.pi/4)
+ local tip=U.renameNote:CreateTexture(nil,'ARTWORK')
+ tip:SetSize(4,4);tip:SetPoint('CENTER',-6,-6)
+ tip:SetColorTexture(0.92,0.9,0.85,1);tip:SetRotation(math.pi/4)
+ U.renameNote:HookScript('OnEnter',function(self)
+  GameTooltip:SetOwner(self,'ANCHOR_TOP');GameTooltip:SetText('Переименовать заметку');GameTooltip:Show()
+ end)
+ U.renameNote:HookScript('OnLeave',function() GameTooltip:Hide() end)
+ U.deleteNote=button(page,'Удалить',590,-78,168,function()
+  if not U.writable or not records[selected] then return end
+  if not confirming then
+   confirming=true;U.deleteNote.label:SetText('Подтвердить удаление')
+   return
+  end
+  table.remove(records,selected);selected=math.min(selected,#records);show();U.Paint()
+ end)
+ U.noteTitle:SetScript('OnTextChanged',function(self,user)
+  if user and U.writable and records[selected] then
+   records[selected].title=self:GetText();cancelDelete();updateBookmarks()
+  end
+ end)
+ U.noteTitle:SetScript('OnEditFocusLost',endRename)
+ U.noteTitle:SetScript('OnEnterPressed',function(self) self:ClearFocus() end)
+ body:SetScript('OnTextChanged',function(self,user)
+  if user and U.writable and records[selected] then
+   records[selected].body=self:GetText();cancelDelete()
+  end
+  fit()
+ end)
+ body:SetScript('OnEscapePressed',function(self) self:ClearFocus() end)
+ page:SetScript('OnHide',function()
+  cancelDelete();U.noteTitle:ClearFocus();body:ClearFocus()
+ end)
+ show()
 end
 local function settings(page)
  heading(page,'Оформление под настроение','Личные настройки • не меняют оформление у других участников')
@@ -481,7 +614,7 @@ local function settings(page)
  U.decorButton=button(page,'',370,-336,350,function() U.settings.decor=not U.settings.decor;U.Refresh();U.Paint() end)
  button(page,'Сбросить оформление',0,-403,300,function()
   local fresh=M.Settings(nil)
-  for k,v in pairs(fresh) do U.settings[k]=v end
+  for k,v in pairs(fresh) do if k~='notes' then U.settings[k]=v end end
   U.displayNameInput:SetText('')
   U.Refresh();U.Paint()
  end)
@@ -513,6 +646,7 @@ function U.Refresh()
  local name=U.settings.displayName~='' and U.settings.displayName or A.guild or 'Гильдейский дом'
  if U.lastGuild~=A.guild then
   U.selected=nil;U.lastGuild=A.guild;U.page=1;U.overviewPage=1;U.overviewFilter='all'
+  U.chatQuery='';U.chatSearch:SetText('')
   if U.composer then U.composer:SetText('') end
   U.announceDraft:SetText('')
   if U.mentionPopup then U.mentionPopup:Hide() end
@@ -602,7 +736,7 @@ function U.Create(settingsValue,writable)
  U.fairyCrest=side:CreateTexture(nil,'ARTWORK')
  text(side,'GUILD PANEL',12,-86,16,160):SetJustifyH('CENTER')
  text(side,'Ваш гильдейский дом',12,-111,11,160):SetJustifyH('CENTER')
- local tabs={{'overview','Обзор'},{'roster','Участники'},{'chat','Чат гильдии'},{'news','Новости'},{'info','Информация'},{'manage','Управление'},{'settings','Настройки'},{'about','Об аддоне'}}
+ local tabs={{'overview','Обзор'},{'roster','Участники'},{'chat','Чат гильдии'},{'news','Новости'},{'info','Информация'},{'manage','Управление'},{'notes','Заметки'},{'settings','Настройки'},{'about','Об аддоне'}}
  for i,v in ipairs(tabs) do
   local key=v[1]
   local b=button(side,v[2],10,-158-(i-1)*48,164,function() U.ShowTab(key) end)
@@ -634,7 +768,7 @@ function U.Create(settingsValue,writable)
   local p=CreateFrame('Frame',nil,f);p:SetPoint('TOPLEFT',222,-112);p:SetPoint('BOTTOMRIGHT',-20,52);U.pages[v[1]]=p
  end
  overview(U.pages.overview);roster(U.pages.roster);chat(U.pages.chat)
- guildNews(U.pages.news);guildInfo(U.pages.info);manage(U.pages.manage);settings(U.pages.settings);about(U.pages.about)
+ guildNews(U.pages.news);guildInfo(U.pages.info);manage(U.pages.manage);notes(U.pages.notes);settings(U.pages.settings);about(U.pages.about)
  U.footer=text(f,'',224,-658,11,590)
  U.footer:ClearAllPoints();U.footer:SetPoint('BOTTOMLEFT',224,20)
  local refresh=button(f,'Обновить',0,0,120,function()

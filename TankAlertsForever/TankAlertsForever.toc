@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: Tank Tools Forever
+## Notes: Warrior alerts, Battle Shout status and sound settings
+## Version: 1.0.0
+## SavedVariables: TankAlertsForeverDB
+
+Style.lua
+TankAlertsForever.lua
+Shout.lua

@@ -345,7 +345,28 @@ function A.CanAnnounce()
  return (IsGuildLeader and allowed(IsGuildLeader()))
   or (guild and guild.IsGuildOfficer and allowed(guild.IsGuildOfficer()))
 end
-function A.SendAnnouncement(message)
+-- Observe only manually posted, public guild chat; never send or relay it.
+function A.ReceiveChatAnnouncement(message,sender)
+ if not unlocked() or not public(message) or not public(sender)
+  or type(message)~='string' or type(sender)~='string' then return end
+ local body=message:match('^ВАЖНО%s*%-%s*(.-)%s*$')
+ if not validAnnouncement(body) then return end
+ local now=GetTime()
+ if A.lastChatAnnouncement and now-A.lastChatAnnouncement<30 then return end
+ if not A.Read() then return end
+ local realm=GetNormalizedRealmName and GetNormalizedRealmName()
+ if not public(realm) or type(realm)~='string' then realm=nil end
+ for _,row in ipairs(A.rows) do
+  local matches=row.name==sender or (realm and not row.name:find('-',1,true) and sender==row.name..'-'..realm)
+  if matches then
+   if A.GuildRole(row.rankIndex)=='member' then return end
+   A.lastChatAnnouncement=now
+   rememberAnnouncement(body,sender)
+   return body,sender
+  end
+ end
+end
+function A.SendLoggedAnnouncement(message)
  if not A.CanAnnounce() then return false,'Команда доступна главе и офицерам гильдии.' end
  if not validAnnouncement(message) then
   return false,'Введите одну строку до 220 байт без игровой разметки.'
@@ -372,6 +393,18 @@ function A.SendAnnouncement(message)
  end
  A.lastAnnouncementSend=now
  return true,'Оповещение передано клиенту.'
+end
+function A.SendAnnouncement(message)
+ if not A.CanAnnounce() then return false,'Отправка доступна главе и офицерам гильдии.' end
+ if not validAnnouncement(message) then return false,'Введите текст до 220 байт без разметки.' end
+ local now=GetTime()
+ if A.lastPublicAnnouncementSend and now-A.lastPublicAnnouncementSend<30 then
+  return false,'Между объявлениями должно пройти 30 секунд.'
+ end
+ -- Explicit click/Enter only. Never retry a rejected addon transport via chat.
+ local ok,status=A.Send('ВАЖНО - '..message)
+ if ok then A.lastPublicAnnouncementSend=now end
+ return ok,status
 end
 function A.ReceiveAnnouncement(prefix,message,channel,sender)
  if not A.announcementsReady or not public(prefix) or prefix~=announcementPrefix
@@ -446,7 +479,9 @@ function A.History(requestInitial,preview)
   if public(msg) and type(msg)=='table' and public(msg.destroyed) and msg.destroyed==false
    and public(msg.content) and type(msg.content)=='string' and public(msg.author) and type(msg.author)=='table'
    and public(msg.author.name) and type(msg.author.name)=='string' then
-   local opaque=msg.content:find('|K%a%d+|k') or msg.author.name:find('|K%a%d+|k')
+   local opaqueText=msg.content:find('|K%a%d+|k')
+   local opaqueAuthor=msg.author.name:find('|K%a%d+|k')
+   local opaque=opaqueText or opaqueAuthor
    if opaque and not preview then
     hidden=hidden+1
    else
@@ -459,7 +494,11 @@ function A.History(requestInitial,preview)
     local row=M.Message(A.history,msg.author.name,msg.content,time,stamp)
     if row then
      row.historical=true
-     if opaque then row.temporary=true;temporary=temporary+1 end
+     if opaque then
+      row.temporary=true;temporary=temporary+1
+      row.searchAuthor=not opaqueAuthor
+      row.searchText=not opaqueText
+     end
      if public(msg.author.classID) and type(msg.author.classID)=='number' and C_CreatureInfo and C_CreatureInfo.GetClassInfo then
       local info=C_CreatureInfo.GetClassInfo(msg.author.classID)
       if public(info) and type(info)=='table' and public(info.classFile) and type(info.classFile)=='string' then row.class=info.classFile end
@@ -498,16 +537,26 @@ function A.Messages()
    end
   end
   local used={}
+  local function match(row,candidates)
+   local best,distance=nil,3
+   for _,live in ipairs(candidates) do
+    if live.stamp and not used[live] then
+     local delta=math.abs(live.stamp-row.stamp)
+     if delta<distance then best,distance=live,delta end
+    end
+   end
+   if best then used[best]=true;matched[row]=true end
+  end
   for _,row in ipairs(history) do
    if row.stamp and not row.temporary then
-    local best,distance=nil,3
-    -- Live receipt time can cross a second boundary. Pair each public history
-    -- copy with at most one live row, and leave opaque rows to the native preview.
-    for _,live in ipairs(liveByText[key(row)] or {}) do
-     local delta=math.abs(live.stamp-row.stamp)
-     if not used[live] and delta<distance then best,distance=live,delta end
-    end
-    if best then used[best]=true;matched[row]=true end
+    match(row,liveByText[key(row)] or {})
+   end
+  end
+  -- Prefer the live feed when an opaque preview overlaps it. Only public
+  -- timestamps are used here, and each live row can displace one preview row.
+  for _,row in ipairs(history) do
+   if row.stamp and row.temporary then
+    match(row,A.chat)
    end
   end
  end
