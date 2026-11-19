@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import time
 
 repo = os.environ['GITHUB_REPOSITORY']
 assert repo == 'AlohaG0/Guild-Panel'
@@ -28,8 +29,13 @@ for tag, filename, title, notes, latest in (
     if release is None:
         gh('release', 'create', tag, '--repo', repo, '--draft', '--target', target,
            '--title', title, '--notes-file', notes)
-        releases = json.loads(gh('api', f'repos/{repo}/releases?per_page=100').stdout)
-        release = next(item for item in releases if item['tag_name'] == tag)
+        for attempt in range(6):
+            releases = json.loads(gh('api', f'repos/{repo}/releases?per_page=100').stdout)
+            release = next((item for item in releases if item['tag_name'] == tag), None)
+            if release is not None:
+                break
+            time.sleep(2)
+        assert release is not None, 'New draft is not visible yet; rerun to resume safely.'
     asset = next((item for item in release['assets'] if item['name'] == filename), None)
     if asset:
         assert asset.get('digest') == digest, 'Existing asset differs; refusing to overwrite.'
@@ -38,5 +44,5 @@ for tag, filename, title, notes, latest in (
     verified = json.loads(gh('api', f'repos/{repo}/releases/{release["id"]}').stdout)
     asset = next(item for item in verified['assets'] if item['name'] == filename)
     assert asset['state'] == 'uploaded' and asset.get('digest') == digest
-    gh('release', 'edit', tag, '--repo', repo, '--draft=false', '--latest=' + str(latest).lower())
-    print('Published and verified: ' + verified['html_url'])
+    gh('release', 'edit', tag, '--repo', repo, '--draft=false', '--notes-file', notes, '--latest=' + str(latest).lower())
+    print(f'Published and verified: https://github.com/{repo}/releases/tag/{tag}')
