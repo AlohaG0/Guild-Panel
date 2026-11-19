@@ -78,9 +78,9 @@ Guild Panel — отдельное окно гильдии для WoW Forever: �
 
 ## Установка
 
-Исходники в основной ветке обновлены до 0.3.41. Отдельный ZIP-релиз пока остаётся на версии 0.3.33.
+[Скачать Guild Panel 0.3.41 — WinxGuild-0.3.41.zip](https://github.com/AlohaG0/Guild-Panel/releases/download/v0.3.41/WinxGuild-0.3.41.zip)
 
-Для установки 0.3.41 нажмите **Code → Download ZIP**, распакуйте архив и скопируйте находящуюся внутри папку `WinxGuild` в `World of Warcraft/_forever_/Interface/AddOns/` с заменой файлов. Итоговый путь: `Interface/AddOns/WinxGuild/WinxGuild.toc`. Выполните `/reload` или перезапустите игру. Настройки удалять не требуется.
+Распакуйте скачанный архив и скопируйте папку `WinxGuild` в `World of Warcraft/_forever_/Interface/AddOns/` с заменой файлов. Итоговый путь: `Interface/AddOns/WinxGuild/WinxGuild.toc`. Выполните `/reload` или перезапустите игру. Настройки удалять не требуется.
 
 [Страница релизов](https://github.com/AlohaG0/Guild-Panel/releases) · [Сообщить об ошибке](https://github.com/AlohaG0/Guild-Panel/issues)
 
@@ -105,7 +105,9 @@ Guild Panel — отдельное окно гильдии для WoW Forever: �
 
 ### Установка
 
-Нажмите **Code → Download ZIP**, распакуйте архив и скопируйте папку `TankAlertsForever` в `World of Warcraft/_forever_/Interface/AddOns/`. Выполните `/reload` или перезапустите игру. Десять WAV-файлов в подпапке `Sounds` входят в аддон и нужны для голосового сигнала с регулировкой громкости.
+[Скачать Tank Tools Forever 1.0.0 — TankAlertsForever-1.0.0.zip](https://github.com/AlohaG0/Guild-Panel/releases/download/tank-tools-v1.0.0/TankAlertsForever-1.0.0.zip).
+
+Распакуйте скачанный архив и скопируйте папку `TankAlertsForever` в `World of Warcraft/_forever_/Interface/AddOns/`. Выполните `/reload` или перезапустите игру. Десять WAV-файлов в подпапке `Sounds` входят в аддон и нужны для голосового сигнала с регулировкой громкости.
 
 При переходе с ShoutStatusForever оставьте его включённым на первый вход для переноса настроек, затем отключите отдельный ShoutStatusForever и выполните `/reload`. Подробности: [инструкция Tank Tools Forever](TankAlertsForever/README.md).
 
